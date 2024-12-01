@@ -1,6 +1,8 @@
 using IoTProductionLineMonitoring;
+using IoTProductionLineMonitoring.Context;
 using IoTProductionLineMonitoring.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -18,12 +20,18 @@ builder.Services.AddCors(options =>
         });
 });
 
+builder.Services.AddDbContext<IoTProductionLineMonitoringContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("IoTProductionLineMonitoringContext"));
+});
+
 // Add services to the container.
 builder.Services.AddSignalR(hubOptions =>
 {
     hubOptions.EnableDetailedErrors = true;
 });
 builder.Services.AddSingleton<MockDataService>();
+builder.Services.AddHostedService<MockDataService>();
 builder.Services.AddLogging();
 
 builder.Services.AddControllers();

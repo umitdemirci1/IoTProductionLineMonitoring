@@ -1,47 +1,58 @@
-﻿using IoTProductionLineMonitoring.Models;
+﻿using IoTProductionLineMonitoring.Context;
+using IoTProductionLineMonitoring.Models;
 using Microsoft.AspNetCore.SignalR;
 
 namespace IoTProductionLineMonitoring.Services
 {
-    public class MockDataService
+    public class MockDataService : IHostedService, IDisposable
     {
         private static readonly Random Random = new();
-        private readonly List<SensorData> _sensorDataList = new();
-        private readonly Timer _timer;
+        private Timer _timer;
         private readonly IHubContext<SensorHub> _hubContext;
         private readonly ILogger<MockDataService> _logger;
+        private readonly IServiceProvider _serviceProvider;
 
-        public MockDataService(IHubContext<SensorHub> hubContext, ILogger<MockDataService> logger)
+        public MockDataService(IHubContext<SensorHub> hubContext, ILogger<MockDataService> logger, IServiceProvider serviceProvider)
         {
             _hubContext = hubContext;
             _logger = logger;
-            Sensors = new List<Sensor>
-                {
-                    new Sensor { Id = 1, Name = "TempSensor1", Type = "Temperature" },
-                    new Sensor { Id = 2, Name = "VibSensor1", Type = "Vibration" },
-                    new Sensor { Id = 3, Name = "TempSensor2", Type = "Temperature" },
-                    new Sensor { Id = 4, Name = "PowerSensor1", Type = "Power" },
-                    new Sensor { Id = 5, Name = "EnergySensor1", Type = "Energy" }
-                };
+            _serviceProvider = serviceProvider;
+        }
 
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("MockDataService is starting.");
             _timer = new Timer(GenerateAndBroadcastData, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+            return Task.CompletedTask;
         }
 
-        public List<Sensor> Sensors { get; }
-
-        public List<Sensor> GetSensors()
+        public Task StopAsync(CancellationToken cancellationToken)
         {
-            return Sensors;
+            _logger.LogInformation("MockDataService is stopping.");
+            _timer?.Change(Timeout.Infinite, 0);
+            return Task.CompletedTask;
         }
 
-        public IEnumerable<SensorData> GetSensorData(int sensorId)
+        public void Dispose()
         {
-            return _sensorDataList.Where(data => data.SensorId == sensorId);
+            _timer?.Dispose();
         }
 
-        private void GenerateSensorData(object? state)
+        private List<Sensor> GetSensors()
         {
-            foreach (var sensor in Sensors)
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<IoTProductionLineMonitoringContext>();
+                return dbContext.Sensors.ToList();
+            }
+        }
+
+        private List<SensorData> GenerateSensorData()
+        {
+            var sensors = GetSensors();
+            var newSensorDataList = new List<SensorData>();
+
+            foreach (var sensor in sensors)
             {
                 double value = sensor.Type switch
                 {
@@ -53,27 +64,37 @@ namespace IoTProductionLineMonitoring.Services
 
                 var newData = new SensorData
                 {
-                    Id = _sensorDataList.Count + 1,
                     SensorId = sensor.Id,
                     Value = value,
                     Timestamp = DateTime.Now
                 };
 
-                _sensorDataList.Add(newData);
+                newSensorDataList.Add(newData);
+
                 _logger.LogInformation($"New data generated for sensor {sensor.Id} at {newData.Timestamp}: {newData.Value}");
             }
+
+            return newSensorDataList;
         }
 
         private double GenerateIncreasingValue(int sensorId)
         {
-            var lastValue = _sensorDataList.LastOrDefault(d => d.SensorId == sensorId)?.Value ?? 0;
+            var lastValue = 0.0;
             return lastValue + Random.NextDouble() * 5;
         }
 
         private void GenerateAndBroadcastData(object? state)
         {
-            GenerateSensorData(null);
-            _hubContext.Clients.All.SendAsync("ReceiveSensorData", _sensorDataList);
+            var newSensorData = GenerateSensorData();
+
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<IoTProductionLineMonitoringContext>();
+                dbContext.SensorData.AddRange(newSensorData);
+                dbContext.SaveChanges();
+            }
+
+            _hubContext.Clients.All.SendAsync("ReceiveSensorData", newSensorData);
         }
     }
 }
