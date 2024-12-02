@@ -12,6 +12,8 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 
 ChartJS.register(
   CategoryScale,
@@ -25,6 +27,7 @@ ChartJS.register(
 
 const RealTimeChart = () => {
   const [data, setData] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const connection = new HubConnectionBuilder()
@@ -36,9 +39,9 @@ const RealTimeChart = () => {
       .withAutomaticReconnect()
       .build();
 
-    connection
-      .start()
-      .then(() => {
+    const startConnection = async () => {
+      try {
+        await connection.start();
         console.log("Connected to SignalR hub");
         connection.on("ReceiveSensorData", (newSensorData) => {
           console.log("New data received:", newSensorData);
@@ -54,9 +57,15 @@ const RealTimeChart = () => {
             });
             return updatedData;
           });
+          setLoading(false);
         });
-      })
-      .catch((error) => console.error("Connection failed: ", error));
+      } catch (error) {
+        console.error("Connection failed: ", error);
+        setTimeout(startConnection, 5000);
+      }
+    };
+
+    startConnection();
 
     return () => {
       connection.stop();
@@ -95,27 +104,37 @@ const RealTimeChart = () => {
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-4">Real-time Sensor Data</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Object.keys(data).map((sensorId) => (
-          <div key={sensorId} className="bg-white p-4 rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-2">Sensor {sensorId}</h3>
-            <Line
-              data={{
-                labels: data[sensorId].map((d) => new Date(d.timestamp)),
-                datasets: [
-                  {
-                    label: `Sensor ${sensorId}`,
-                    data: data[sensorId].map((d) => d.value),
-                    fill: false,
-                    borderColor: "rgba(75,192,192,1)",
-                  },
-                ],
-              }}
-              options={options}
-            />
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="bg-white p-4 rounded-lg shadow-md">
+              <Skeleton height={200} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Object.keys(data).map((sensorId) => (
+            <div key={sensorId} className="bg-white p-4 rounded-lg shadow-md">
+              <h3 className="text-xl font-semibold mb-2">Sensor {sensorId}</h3>
+              <Line
+                data={{
+                  labels: data[sensorId].map((d) => new Date(d.timestamp)),
+                  datasets: [
+                    {
+                      label: `Sensor ${sensorId}`,
+                      data: data[sensorId].map((d) => d.value),
+                      fill: false,
+                      borderColor: "rgba(75,192,192,1)",
+                    },
+                  ],
+                }}
+                options={options}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
