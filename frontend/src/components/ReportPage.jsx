@@ -1,9 +1,27 @@
 import { useState } from "react";
 import axios from "axios";
-import { Line } from "react-chartjs-2";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const ReportPage = () => {
-  const [sensorId, setSensorId] = useState("");
+  const [productionLineId, setProductionLineId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [analytics, setAnalytics] = useState(null);
@@ -12,9 +30,10 @@ const ReportPage = () => {
   const fetchAnalytics = async () => {
     try {
       const response = await axios.get(
-        `https://localhost:7290/api/SensorData/sensor/${sensorId}/analytics`,
+        `https://localhost:7290/api/ProductionLine/production-line/${productionLineId}/analytics`,
         { params: { startDate, endDate } }
       );
+      console.log("API Response:", response.data);
       setAnalytics(response.data);
       setError("");
     } catch (error) {
@@ -27,10 +46,9 @@ const ReportPage = () => {
     responsive: true,
     scales: {
       x: {
-        type: "linear",
         title: {
           display: true,
-          text: "Hour",
+          text: "Sensor",
         },
       },
       y: {
@@ -44,14 +62,14 @@ const ReportPage = () => {
     plugins: {
       title: {
         display: true,
-        text: "Sensor Analytics",
+        text: "Production Line Analytics",
       },
     },
   };
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Sensor Analytics</h2>
+      <h2 className="text-2xl font-bold mb-4">Production Line Analytics</h2>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -60,11 +78,11 @@ const ReportPage = () => {
         className="mb-4"
       >
         <label className="block mb-2">
-          Sensor ID:
+          Production Line ID:
           <input
             type="text"
-            value={sensorId}
-            onChange={(e) => setSensorId(e.target.value)}
+            value={productionLineId}
+            onChange={(e) => setProductionLineId(e.target.value)}
             className="border p-2 rounded w-full"
           />
         </label>
@@ -96,18 +114,19 @@ const ReportPage = () => {
 
       {error && <p className="text-red-500">{error}</p>}
 
-      {analytics && analytics.groupedByHour && (
+      {analytics && (
         <div>
           <h3 className="text-xl font-semibold mb-4">Analytics Data</h3>
-          <Line
+          <Bar
             data={{
-              labels: analytics.groupedByHour.map((d) => d.hour),
+              labels: analytics.map((sensor) => sensor.sensorName),
               datasets: [
                 {
                   label: "Average Value",
-                  data: analytics.groupedByHour.map((d) => d.average),
-                  fill: false,
+                  data: analytics.map((sensor) => sensor.average),
+                  backgroundColor: "rgba(75,192,192,0.4)",
                   borderColor: "rgba(75,192,192,1)",
+                  borderWidth: 1,
                 },
               ],
             }}
