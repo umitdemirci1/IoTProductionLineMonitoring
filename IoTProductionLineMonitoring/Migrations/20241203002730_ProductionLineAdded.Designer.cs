@@ -4,6 +4,7 @@ using IoTProductionLineMonitoring.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IoTProductionLineMonitoring.Migrations
 {
     [DbContext(typeof(IoTProductionLineMonitoringContext))]
-    partial class IoTProductionLineMonitoringContextModelSnapshot : ModelSnapshot
+    [Migration("20241203002730_ProductionLineAdded")]
+    partial class ProductionLineAdded
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
